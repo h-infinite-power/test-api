@@ -1,0 +1,46 @@
+# Database 
+- dbms : Mysql
+- 스키마 : testAttendance
+- ddl정의서 경로 : ./db-ddl
+- 데이터베이스 접속 정보 : 
+  - host : localhost
+  - port : 3306
+  - username : root
+  - password : password
+- db-access : JPA  
+
+# rest-api
+- rest-api 정의서 경로 : ./rest-api
+
+# 코딩 컨벤션
+- table name으로 디렉터리가 분리되고 controller, service, repository, entity, dto 등은 각각의 패키지로 분리되어 있음
+- ex) 
+  - com.example.testattendances.controller
+  - com.example.testattendances.service
+  - com.example.testattendances.repository
+  - com.example.testattendances.entity
+  - com.example.testattendances.dto
+- 각 패키지 내에서는 관련된 클래스들끼리 묶어서 관리함
+- Repository의 경우 JpaRepository를 상속받아 사용하며 간단한 경우 이름메서드로 처리함
+  - join이 들어가는 경우 이름 메서드를 사용하지 않고 @Query(nativeQuery = true)로 작성함
+- entity 클래스는 @Entity 어노테이션을 사용하여 정의하며 class명은 테이블이름의 복수형 s를 제외한 형태임, 테이블 이름은 TableName 어노테이션으로 지정함
+- 모든 table row 생성시에 id는 시계열에 따른 id를 얻어내는 전역 static 메서드를 통해 생성한다.(중복이 최대한 되지 않도록, 시계열 생성이므로 아이디의 순차적인 오름차순은 유지됨)
+
+# 도메인
+## 개요
+Test 용 rest api서버로서 출석체크를 해주는 앱임
+
+## 사용자 flow
+- 모든 영역에서는 rest-api를 호출해서 모든 기능을 구현한다. 추가 api는 없으며 수정되지도 않는다. 
+- 최초 페이지는 회원추가 및 회원선택 영역이 있음
+### 회원추가 영역
+이름만을 입력하여 회원 추가 가능함 
+### 회원선택 영역
+- 로그인기능은 없으며 최초 멤버 목록 셀렉트박스에서 이름을 선택할 수 있음(동명이인 고려하지 않음)
+- 검색도 가능하며 특정인의 이름을 선택한 후 접속버튼 클릭하면 일자별로 출석체크한 사람들의 목록을 볼 수 있음 
+### 출석체크 목록
+- `GET /test-api/test-attendances` 를 통해 반환받은 데이터들로 출석체크 목록을 보여줌
+### 출석 체크 상세 조회
+- `GET /test-api/test-attendances/{testAttendanceId}` 를 통해 특정 출석체크의 상세 정보를 볼 수 있음
+- 상세 조회에서는 댓글 확인 및 좋아요 누른 사람 목록을 확인 가능함(출석체크 상세조회시에 좋아요 누른사람 목록 및 댓글내용이 모두 포함되어 있음)
+- 댓글 등록/수정/삭제가 가능함
