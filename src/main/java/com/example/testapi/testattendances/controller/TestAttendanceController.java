@@ -174,7 +174,7 @@ public class TestAttendanceController {
     @DeleteMapping("/{testAttendanceId}")
     public ResponseEntity<Void> deleteAttendance(
             @Parameter(description = "삭제할 출석 체크의 ID", example = "10")
-            @PathVariable String testAttendanceId) {
+            @PathVariable Long testAttendanceId) {
         testAttendanceService.deleteAttendance(testAttendanceId);
         return ResponseEntity.noContent().build();
     }
@@ -212,7 +212,7 @@ public class TestAttendanceController {
     @PostMapping("/{testAttendanceId}/test-likes")
     public ResponseEntity<TestLikeDto.Response> addLike(
             @Parameter(description = "좋아요를 추가할 출석 체크의 ID", example = "10")
-            @PathVariable String testAttendanceId,
+            @PathVariable Long testAttendanceId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "좋아요 추가 정보",
                 required = true,
@@ -252,7 +252,7 @@ public class TestAttendanceController {
     @PostMapping("/{testAttendanceId}/test-comments")
     public ResponseEntity<TestCommentDto.Response> addComment(
             @Parameter(description = "댓글을 추가할 출석 체크의 ID", example = "10")
-            @PathVariable String testAttendanceId,
+            @PathVariable Long testAttendanceId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "댓글 등록 정보",
                 required = true,

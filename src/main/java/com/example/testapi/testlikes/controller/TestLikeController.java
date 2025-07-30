@@ -43,7 +43,7 @@ public class TestLikeController {
     @DeleteMapping("/{testLikeId}")
     public ResponseEntity<Void> deleteLike(
             @Parameter(description = "삭제할 좋아요의 ID", example = "10")
-            @PathVariable String testLikeId) {
+            @PathVariable Long testLikeId) {
         testLikeService.deleteLike(testLikeId);
         return ResponseEntity.noContent().build();
     }

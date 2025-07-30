@@ -81,7 +81,7 @@ public class TestMemberController {
     @GetMapping("/{testMemberId}")
     public ResponseEntity<TestMemberDto.Response> getMember(
             @Parameter(description = "조회할 구성원의 ID", example = "1")
-            @PathVariable String testMemberId) {
+            @PathVariable Long testMemberId) {
         return ResponseEntity.ok(testMemberService.getMember(testMemberId));
     }
 
@@ -106,7 +106,7 @@ public class TestMemberController {
     @PutMapping("/{testMemberId}")
     public ResponseEntity<TestMemberDto.Response> updateMember(
             @Parameter(description = "수정할 구성원의 ID", example = "1")
-            @PathVariable String testMemberId,
+            @PathVariable Long testMemberId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "수정할 구성원 정보",
                 required = true,
@@ -135,7 +135,7 @@ public class TestMemberController {
     @DeleteMapping("/{testMemberId}")
     public ResponseEntity<Void> deleteMember(
             @Parameter(description = "삭제할 구성원의 ID", example = "1")
-            @PathVariable String testMemberId) {
+            @PathVariable Long testMemberId) {
         testMemberService.deleteMember(testMemberId);
         return ResponseEntity.noContent().build();
     }

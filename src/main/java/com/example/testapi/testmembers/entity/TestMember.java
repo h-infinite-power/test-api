@@ -12,7 +12,7 @@ import lombok.Setter;
 @Setter
 public class TestMember {
     @Id
-    private String testMemberId;
+    private Long testMemberId;
     @Column(nullable = false, length = 100)
     private String testMemberName;
 }

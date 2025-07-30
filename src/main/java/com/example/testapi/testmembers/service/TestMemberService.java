@@ -17,7 +17,7 @@ public class TestMemberService {
     @Transactional
     public TestMemberDto.Response createMember(TestMemberDto.Request request) {
         TestMember testMember = new TestMember();
-        testMember.setTestMemberId(IdGenerator.generateId("MEM"));
+        testMember.setTestMemberId(IdGenerator.generateId());
         testMember.setTestMemberName(request.getTestMemberName());
         
         TestMember savedMember = testMemberRepository.save(testMember);
@@ -28,7 +28,7 @@ public class TestMemberService {
         return response;
     }
 
-    public TestMemberDto.Response getMember(String testMemberId) {
+    public TestMemberDto.Response getMember(Long testMemberId) {
         TestMember testMember = testMemberRepository.findById(testMemberId)
                 .orElseThrow(() -> new RuntimeException("Member not found"));
 
@@ -39,7 +39,7 @@ public class TestMemberService {
     }
 
     @Transactional
-    public TestMemberDto.Response updateMember(String testMemberId, TestMemberDto.Request request) {
+    public TestMemberDto.Response updateMember(Long testMemberId, TestMemberDto.Request request) {
         TestMember testMember = testMemberRepository.findById(testMemberId)
                 .orElseThrow(() -> new RuntimeException("Member not found"));
 
@@ -53,7 +53,7 @@ public class TestMemberService {
     }
 
     @Transactional
-    public void deleteMember(String testMemberId) {
+    public void deleteMember(Long testMemberId) {
         if (!testMemberRepository.existsById(testMemberId)) {
             throw new RuntimeException("Member not found");
         }

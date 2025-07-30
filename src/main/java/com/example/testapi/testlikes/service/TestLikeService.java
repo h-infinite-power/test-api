@@ -21,7 +21,7 @@ public class TestLikeService {
     private final TestMemberRepository testMemberRepository;
 
     @Transactional
-    public TestLikeDto.Response createLike(String testAttendanceId, TestLikeDto.Request request) {
+    public TestLikeDto.Response createLike(Long testAttendanceId, TestLikeDto.Request request) {
         TestAttendance attendance = testAttendanceRepository.findById(testAttendanceId)
                 .orElseThrow(() -> new RuntimeException("Attendance not found"));
 
@@ -29,7 +29,7 @@ public class TestLikeService {
                 .orElseThrow(() -> new RuntimeException("Member not found"));
 
         TestLike testLike = new TestLike();
-        testLike.setTestLikeId(IdGenerator.generateId("LIK"));
+        testLike.setTestLikeId(IdGenerator.generateId());
         testLike.setTestAttendance(attendance);
         testLike.setTestMember(member);
 
@@ -41,7 +41,7 @@ public class TestLikeService {
     }
 
     @Transactional
-    public void deleteLike(String testLikeId) {
+    public void deleteLike(Long testLikeId) {
         if (!testLikeRepository.existsById(testLikeId)) {
             throw new RuntimeException("Like not found");
         }

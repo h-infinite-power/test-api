@@ -40,7 +40,7 @@ public class TestCommentController {
     @PutMapping("/{testCommentId}")
     public ResponseEntity<TestCommentDto.Response> updateComment(
             @Parameter(description = "수정할 댓글의 ID", example = "1")
-            @PathVariable String testCommentId,
+            @PathVariable Long testCommentId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "수정할 댓글 정보",
                 required = true,
@@ -69,7 +69,7 @@ public class TestCommentController {
     @DeleteMapping("/{testCommentId}")
     public ResponseEntity<Void> deleteComment(
             @Parameter(description = "삭제할 댓글의 ID", example = "1")
-            @PathVariable String testCommentId) {
+            @PathVariable Long testCommentId) {
         testCommentService.deleteComment(testCommentId);
         return ResponseEntity.noContent().build();
     }

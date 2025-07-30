@@ -15,7 +15,7 @@ import java.time.LocalDate;
 @Setter
 public class TestAttendance {
     @Id
-    private String testAttendanceId;
+    private Long testAttendanceId;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "testMemberId", nullable = false)

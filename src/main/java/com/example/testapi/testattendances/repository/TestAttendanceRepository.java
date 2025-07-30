@@ -7,7 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-public interface TestAttendanceRepository extends JpaRepository<TestAttendance, String> {
+public interface TestAttendanceRepository extends JpaRepository<TestAttendance, Long> {
     @Query(value = "SELECT ta.*, " +
            "(SELECT COUNT(*) FROM TestLike tl WHERE tl.testAttendanceId = ta.testAttendanceId) as testLikesCount, " +
            "(SELECT COUNT(*) FROM TestComment tc WHERE tc.testAttendanceId = ta.testAttendanceId) as testCommentsCount " +

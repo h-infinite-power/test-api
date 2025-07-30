@@ -28,7 +28,7 @@ public class TestAttendanceService {
                 .orElseThrow(() -> new RuntimeException("Member not found"));
 
         TestAttendance attendance = new TestAttendance();
-        attendance.setTestAttendanceId(IdGenerator.generateId("ATT"));
+        attendance.setTestAttendanceId(IdGenerator.generateId());
         attendance.setTestMember(member);
         attendance.setTestAttendanceDate(LocalDate.now());
 
@@ -76,8 +76,8 @@ public class TestAttendanceService {
                 .filter(result -> result[1] != null) // testLikeId not null
                 .map(result -> {
                     TestAttendanceDto.TestLikeInfo likeInfo = new TestAttendanceDto.TestLikeInfo();
-                    likeInfo.setTestLikeId((String) result[1]);
-                    likeInfo.setTestMemberId((String) result[2]);
+                    likeInfo.setTestLikeId((long) result[1]);
+                    likeInfo.setTestMemberId((long) result[2]);
                     likeInfo.setTestMemberName((String) result[3]);
                     return likeInfo;
                 })
@@ -87,8 +87,8 @@ public class TestAttendanceService {
                 .filter(result -> result[4] != null) // testCommentId not null
                 .map(result -> {
                     TestAttendanceDto.TestCommentInfo commentInfo = new TestAttendanceDto.TestCommentInfo();
-                    commentInfo.setTestCommentId((String) result[4]);
-                    commentInfo.setTestMemberId((String) result[5]);
+                    commentInfo.setTestCommentId((long) result[4]);
+                    commentInfo.setTestMemberId((long) result[5]);
                     commentInfo.setTestMemberName((String) result[6]);
                     commentInfo.setTestComment((String) result[7]);
                     return commentInfo;
@@ -101,7 +101,7 @@ public class TestAttendanceService {
     }
 
     @Transactional
-    public void deleteAttendance(String testAttendanceId) {
+    public void deleteAttendance(Long testAttendanceId) {
         if (!testAttendanceRepository.existsById(testAttendanceId)) {
             throw new RuntimeException("Attendance not found");
         }

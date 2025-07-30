@@ -1,5 +1,8 @@
 package com.example.testapi.testattendances.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDate;
@@ -9,14 +12,20 @@ public class TestAttendanceDto {
     @Getter
     @Setter
     public static class Request {
-        private String testMemberId;
+        @JsonSerialize(using = ToStringSerializer.class)
+        @Schema(type = "string")
+        private Long testMemberId;
     }
 
     @Getter
     @Setter
     public static class Response {
-        private String testAttendanceId;
-        private String testMemberId;
+        @JsonSerialize(using = ToStringSerializer.class)
+        @Schema(type = "string")
+        private Long testAttendanceId;
+        @JsonSerialize(using = ToStringSerializer.class)
+        @Schema(type = "string")
+        private Long testMemberId;
         private LocalDate testAttendanceDate;
         private int testLikesCount;
         private int testCommentsCount;
@@ -25,8 +34,12 @@ public class TestAttendanceDto {
     @Getter
     @Setter
     public static class DetailResponse {
-        private String testAttendanceId;
-        private String testMemberId;
+        @JsonSerialize(using = ToStringSerializer.class)
+        @Schema(type = "string")
+        private Long testAttendanceId;
+        @JsonSerialize(using = ToStringSerializer.class)
+        @Schema(type = "string")
+        private Long testMemberId;
         private LocalDate testAttendanceDate;
         private List<TestLikeInfo> testLikes;
         private List<TestCommentInfo> testComments;
@@ -35,16 +48,24 @@ public class TestAttendanceDto {
     @Getter
     @Setter
     public static class TestLikeInfo {
-        private String testLikeId;
-        private String testMemberId;
+        @JsonSerialize(using = ToStringSerializer.class)
+        @Schema(type = "string")
+        private Long testLikeId;
+        @JsonSerialize(using = ToStringSerializer.class)
+        @Schema(type = "string")
+        private Long testMemberId;
         private String testMemberName;
     }
 
     @Getter
     @Setter
     public static class TestCommentInfo {
-        private String testCommentId;
-        private String testMemberId;
+        @JsonSerialize(using = ToStringSerializer.class)
+        @Schema(type = "string")
+        private Long testCommentId;
+        @JsonSerialize(using = ToStringSerializer.class)
+        @Schema(type = "string")
+        private Long testMemberId;
         private String testMemberName;
         private String testComment;
     }

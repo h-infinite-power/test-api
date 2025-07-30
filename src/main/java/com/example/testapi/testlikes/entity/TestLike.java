@@ -14,7 +14,7 @@ import lombok.Setter;
 @Setter
 public class TestLike {
     @Id
-    private String testLikeId;
+    private Long testLikeId;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "testAttendanceId", nullable = false)

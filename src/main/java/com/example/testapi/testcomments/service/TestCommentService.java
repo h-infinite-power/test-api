@@ -21,7 +21,7 @@ public class TestCommentService {
     private final TestMemberRepository testMemberRepository;
 
     @Transactional
-    public TestCommentDto.Response createComment(String testAttendanceId, TestCommentDto.Request request) {
+    public TestCommentDto.Response createComment(Long testAttendanceId, TestCommentDto.Request request) {
         TestAttendance attendance = testAttendanceRepository.findById(testAttendanceId)
                 .orElseThrow(() -> new RuntimeException("Attendance not found"));
 
@@ -29,7 +29,7 @@ public class TestCommentService {
                 .orElseThrow(() -> new RuntimeException("Member not found"));
 
         TestComment comment = new TestComment();
-        comment.setTestCommentId(IdGenerator.generateId("COM"));
+        comment.setTestCommentId(IdGenerator.generateId());
         comment.setTestAttendance(attendance);
         comment.setTestMember(member);
         comment.setTestComment(request.getTestComment());
@@ -42,7 +42,7 @@ public class TestCommentService {
     }
 
     @Transactional
-    public TestCommentDto.Response updateComment(String testCommentId, TestCommentDto.UpdateRequest request) {
+    public TestCommentDto.Response updateComment(Long testCommentId, TestCommentDto.UpdateRequest request) {
         TestComment comment = testCommentRepository.findById(testCommentId)
                 .orElseThrow(() -> new RuntimeException("Comment not found"));
 
@@ -55,8 +55,9 @@ public class TestCommentService {
     }
 
     @Transactional
-    public void deleteComment(String testCommentId) {
-        if (!testCommentRepository.existsById(testCommentId)) {
+    public void deleteComment(Long testCommentId) {
+        final Long id = Long.valueOf(testCommentId);
+        if (!testCommentRepository.existsById(id)) {
             throw new RuntimeException("Comment not found");
         }
         testCommentRepository.deleteById(testCommentId);
