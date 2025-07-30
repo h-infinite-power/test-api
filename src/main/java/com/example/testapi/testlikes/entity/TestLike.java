@@ -5,11 +5,13 @@ import com.example.testapi.testmembers.entity.TestMember;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "TestLikes")
 @Getter
 @NoArgsConstructor
+@Setter
 public class TestLike {
     @Id
     private String testLikeId;
