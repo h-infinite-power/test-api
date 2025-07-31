@@ -1,8 +1,11 @@
 package com.example.testapi.testlikes.controller;
 
+import com.example.testapi.common.swagger.SwaggerParameter;
 import com.example.testapi.testlikes.service.TestLikeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -23,6 +26,9 @@ public class TestLikeController {
         summary = "출석 체크 좋아요 취소",
         description = "출석 체크의 좋아요를 취소합니다. 삭제 후에는 다시 출석 체크 상세조회를 통해 좋아요 수 및 좋아요 누른 사람 데이터를 확인할 수 있습니다."
     )
+    @Parameters({
+        @Parameter(in = ParameterIn.PATH, name = "testLikeId", description = "삭제할 좋아요의 ID", example = SwaggerParameter.TEST_LIKE_ID_EXAMPLE)
+    })
     @ApiResponse(
         responseCode = "204",
         description = "좋아요 취소 성공"
@@ -42,7 +48,6 @@ public class TestLikeController {
     )
     @DeleteMapping("/{testLikeId}")
     public ResponseEntity<Void> deleteLike(
-            @Parameter(description = "삭제할 좋아요의 ID", example = "10")
             @PathVariable Long testLikeId) {
         testLikeService.deleteLike(testLikeId);
         return ResponseEntity.noContent().build();

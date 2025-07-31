@@ -1,5 +1,6 @@
 package com.example.testapi.testattendances.controller;
 
+import com.example.testapi.common.swagger.SwaggerParameter;
 import com.example.testapi.testattendances.dto.TestAttendanceDto;
 import com.example.testapi.testattendances.service.TestAttendanceService;
 import com.example.testapi.testlikes.dto.TestLikeDto;
@@ -8,6 +9,8 @@ import com.example.testapi.testcomments.dto.TestCommentDto;
 import com.example.testapi.testcomments.service.TestCommentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -100,6 +103,9 @@ public class TestAttendanceController {
         summary = "출석 체크 상세 조회",
         description = "특정 출석 체크의 상세 정보를 조회합니다."
     )
+    @Parameters({
+        @Parameter(name = "testAttendanceId", description = "조회할 출석 체크의 ID", example = SwaggerParameter.TEST_ATTENDANCE_ID_EXAMPLE)
+    })
     @ApiResponse(
         responseCode = "200",
         description = "출석 체크 상세 조회 성공",
@@ -145,7 +151,6 @@ public class TestAttendanceController {
     )
     @GetMapping("/{testAttendanceId}")
     public ResponseEntity<TestAttendanceDto.DetailResponse> getAttendanceDetail(
-            @Parameter(description = "조회할 출석 체크의 ID", example = "10")
             @PathVariable String testAttendanceId) {
         return ResponseEntity.ok(testAttendanceService.getAttendanceDetail(testAttendanceId));
     }
@@ -154,6 +159,9 @@ public class TestAttendanceController {
         summary = "출석 체크 삭제",
         description = "특정 출석 체크를 삭제합니다."
     )
+    @Parameters({
+        @Parameter(name = "testAttendanceId", description = "삭제할 출석 체크의 ID", example = SwaggerParameter.TEST_ATTENDANCE_ID_EXAMPLE)
+    })
     @ApiResponse(
         responseCode = "204",
         description = "출석 체크 삭제 성공"
@@ -173,7 +181,6 @@ public class TestAttendanceController {
     )
     @DeleteMapping("/{testAttendanceId}")
     public ResponseEntity<Void> deleteAttendance(
-            @Parameter(description = "삭제할 출석 체크의 ID", example = "10")
             @PathVariable Long testAttendanceId) {
         testAttendanceService.deleteAttendance(testAttendanceId);
         return ResponseEntity.noContent().build();
@@ -183,6 +190,9 @@ public class TestAttendanceController {
         summary = "출석 체크 좋아요 추가",
         description = "특정 출석 체크에 좋아요를 추가합니다."
     )
+    @Parameters({
+        @Parameter(in = ParameterIn.PATH, name = "testAttendanceId", description = "좋아요를 추가할 출석 체크의 ID", example = SwaggerParameter.TEST_ATTENDANCE_ID_EXAMPLE)
+    })
     @ApiResponse(
         responseCode = "201",
         description = "좋아요 추가 성공",
@@ -191,7 +201,7 @@ public class TestAttendanceController {
             examples = @ExampleObject(
                 value = """
                     {
-                      "testLikeId": 10
+                      "testLikeId": """ + SwaggerParameter.TEST_LIKE_ID_EXAMPLE + """
                     }"""
             )
         )
@@ -211,7 +221,6 @@ public class TestAttendanceController {
     )
     @PostMapping("/{testAttendanceId}/test-likes")
     public ResponseEntity<TestLikeDto.Response> addLike(
-            @Parameter(description = "좋아요를 추가할 출석 체크의 ID", example = "10")
             @PathVariable Long testAttendanceId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "좋아요 추가 정보",
@@ -236,6 +245,9 @@ public class TestAttendanceController {
         summary = "댓글 등록",
         description = "특정 출석 체크에 댓글을 등록합니다."
     )
+    @Parameters({
+        @Parameter(in = ParameterIn.PATH, name = "testAttendanceId", description = "댓글을 추가할 출석 체크의 ID", example = SwaggerParameter.TEST_ATTENDANCE_ID_EXAMPLE)
+    })
     @ApiResponse(
         responseCode = "201",
         description = "댓글 등록 성공",
@@ -244,14 +256,13 @@ public class TestAttendanceController {
             examples = @ExampleObject(
                 value = """
                     {
-                      "testCommentId": 1
+                      "testCommentId": """ + SwaggerParameter.TEST_COMMENT_ID_EXAMPLE + """
                     }"""
             )
         )
     )
     @PostMapping("/{testAttendanceId}/test-comments")
     public ResponseEntity<TestCommentDto.Response> addComment(
-            @Parameter(description = "댓글을 추가할 출석 체크의 ID", example = "10")
             @PathVariable Long testAttendanceId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "댓글 등록 정보",

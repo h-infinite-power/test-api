@@ -1,12 +1,14 @@
 package com.example.testapi.testmembers.controller;
 
+import com.example.testapi.common.swagger.SwaggerParameter;
 import com.example.testapi.testmembers.dto.TestMemberDto;
 import com.example.testapi.testmembers.service.TestMemberService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -34,10 +36,7 @@ public class TestMemberController {
         content = @Content(
             mediaType = MediaType.APPLICATION_JSON_VALUE,
             examples = @ExampleObject(
-                value = """
-                    {
-                      "testMemberId": 1
-                    }"""
+                value = "{\n  \"testMemberId\": " + SwaggerParameter.TEST_MEMBER_ID_EXAMPLE + "\n}"
             )
         )
     )
@@ -72,17 +71,7 @@ public class TestMemberController {
         content = @Content(
             mediaType = MediaType.APPLICATION_JSON_VALUE,
             examples = @ExampleObject(
-                value = """
-                    [
-                      {
-                        "testMemberId": 1,
-                        "testMemberName": "홍길동"
-                      },
-                      {
-                        "testMemberId": 2,
-                        "testMemberName": "김철수"
-                      }
-                    ]"""
+                value = "[\n  {\n    \"testMemberId\": " + SwaggerParameter.TEST_MEMBER_ID_EXAMPLE + ",\n    \"testMemberName\": \"홍길동\"\n  },\n  {\n    \"testMemberId\": " + SwaggerParameter.TEST_MEMBER_ID_EXAMPLE_2 + ",\n    \"testMemberName\": \"김철수\"\n  }\n]"
             )
         )
     )
@@ -95,23 +84,21 @@ public class TestMemberController {
         summary = "구성원 조회",
         description = "구성원 ID로 구성원 정보를 조회합니다."
     )
+    @Parameters({
+        @Parameter(in = ParameterIn.PATH, name = "testMemberId", description = "조회할 구성원의 ID", example = SwaggerParameter.TEST_MEMBER_ID_EXAMPLE)
+    })
     @ApiResponse(
         responseCode = "200",
         description = "구성원 조회 성공",
         content = @Content(
             mediaType = MediaType.APPLICATION_JSON_VALUE,
             examples = @ExampleObject(
-                value = """
-                    {
-                      "testMemberId": 1,
-                      "testMemberName": "홍길동"
-                    }"""
+                value = "{\n  \"testMemberId\": " + SwaggerParameter.TEST_MEMBER_ID_EXAMPLE + ",\n  \"testMemberName\": \"홍길동\"\n}"
             )
         )
     )
     @GetMapping("/{testMemberId}")
     public ResponseEntity<TestMemberDto.Response> getMember(
-            @Parameter(description = "조회할 구성원의 ID", example = "1")
             @PathVariable Long testMemberId) {
         return ResponseEntity.ok(testMemberService.getMember(testMemberId));
     }
@@ -120,23 +107,21 @@ public class TestMemberController {
         summary = "구성원 수정",
         description = "구성원의 정보를 수정합니다."
     )
+    @Parameters({
+        @Parameter(in = ParameterIn.PATH, name = "testMemberId", description = "수정할 구성원의 ID", example = SwaggerParameter.TEST_MEMBER_ID_EXAMPLE)
+    })
     @ApiResponse(
         responseCode = "200",
         description = "구성원 수정 성공",
         content = @Content(
             mediaType = MediaType.APPLICATION_JSON_VALUE,
             examples = @ExampleObject(
-                value = """
-                    {
-                      "testMemberId": 1,
-                      "testMemberName": "홍길동 수정"
-                    }"""
+                value = "{\n  \"testMemberId\": " + SwaggerParameter.TEST_MEMBER_ID_EXAMPLE + ",\n  \"testMemberName\": \"홍길동 수정\"\n}"
             )
         )
     )
     @PutMapping("/{testMemberId}")
     public ResponseEntity<TestMemberDto.Response> updateMember(
-            @Parameter(description = "수정할 구성원의 ID", example = "1")
             @PathVariable Long testMemberId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 description = "수정할 구성원 정보",
@@ -159,13 +144,15 @@ public class TestMemberController {
         summary = "구성원 삭제",
         description = "구성원을 삭제합니다."
     )
+    @Parameters({
+        @Parameter(in = ParameterIn.PATH, name = "testMemberId", description = "삭제할 구성원의 ID", example = SwaggerParameter.TEST_MEMBER_ID_EXAMPLE)
+    })
     @ApiResponse(
         responseCode = "204",
         description = "구성원 삭제 성공"
     )
     @DeleteMapping("/{testMemberId}")
     public ResponseEntity<Void> deleteMember(
-            @Parameter(description = "삭제할 구성원의 ID", example = "1")
             @PathVariable Long testMemberId) {
         testMemberService.deleteMember(testMemberId);
         return ResponseEntity.noContent().build();
