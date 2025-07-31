@@ -1,27 +1,41 @@
 package com.example.testapi.testattendances.repository;
 
+import com.example.testapi.testattendances.dto.TestAttendanceDetailDto;
+import com.example.testapi.testattendances.dto.TestAttendanceDto;
+import com.example.testapi.testattendances.dto.TestAttendanceWithCountsDto;
 import com.example.testapi.testattendances.entity.TestAttendance;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface TestAttendanceRepository extends JpaRepository<TestAttendance, Long> {
-    @Query(value = "SELECT ta.*, " +
-           "(SELECT COUNT(*) FROM TestLike tl WHERE tl.testAttendanceId = ta.testAttendanceId) as testLikesCount, " +
-           "(SELECT COUNT(*) FROM TestComment tc WHERE tc.testAttendanceId = ta.testAttendanceId) as testCommentsCount " +
-           "FROM TestAttendance ta", nativeQuery = true)
-    List<Object[]> findAllWithCounts();
+    @Query(value = "SELECT ta.testAttendanceId, ta.testMember.testMemberId, ta.testAttendanceDate, " +
+           "(SELECT COUNT(*) FROM TestLike tl WHERE tl.testAttendance.testAttendanceId = ta.testAttendanceId) as testLikesCount, " +
+           "(SELECT COUNT(*) FROM TestComment tc WHERE tc.testAttendance.testAttendanceId = ta.testAttendanceId) as testCommentsCount " +
+           "FROM TestAttendance ta")
+    List<TestAttendanceWithCountsDto> findAllWithCounts();
 
-    @Query(value = "SELECT ta.*, " +
-           "tl.testLikeId, tl.testMemberId as likeTestMemberId, tm1.testMemberName as likeMemberName, " +
-           "tc.testCommentId, tc.testMemberId as commentTestMemberId, tm2.testMemberName as commentMemberName, tc.testComment " +
-           "FROM TestAttendance ta " +
-           "LEFT JOIN TestLike tl ON ta.testAttendanceId = tl.testAttendanceId " +
-           "LEFT JOIN TestMember tm1 ON tl.testMemberId = tm1.testMemberId " +
-           "LEFT JOIN TestComment tc ON ta.testAttendanceId = tc.testAttendanceId " +
-           "LEFT JOIN TestMember tm2 ON tc.testMemberId = tm2.testMemberId " +
-           "WHERE ta.testAttendanceId = :testAttendanceId", nativeQuery = true)
-    List<Object[]> findByIdWithDetails(@Param("testAttendanceId") String testAttendanceId);
+    @Query(value = """
+           SELECT DISTINCT ta 
+                FROM TestAttendance ta
+                LEFT JOIN FETCH ta.testMember
+                LEFT JOIN FETCH ta.testLikes 
+                LEFT JOIN FETCH ta.testLikes.testMember
+                LEFT JOIN FETCH ta.testComments
+                LEFT JOIN FETCH ta.testComments.testMember
+                WHERE ta.testAttendanceId = :testAttendanceId 
+           """)
+    List<TestAttendance> findByIdWithDetails(@Param("testAttendanceId") Long testAttendanceId);
+
+    @Query(value = """
+           SELECT ta  
+           FROM TestAttendance ta
+           WHERE ta.testMember.testMemberId = :testMemberId AND ta.testAttendanceDate = :testAttendanceDate
+           """)
+    List<TestAttendance> findByMemberIdAndDate(Long testMemberId, LocalDate testAttendanceDate);
+
 }

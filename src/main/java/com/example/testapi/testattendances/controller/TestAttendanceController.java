@@ -2,6 +2,7 @@ package com.example.testapi.testattendances.controller;
 
 import com.example.testapi.common.swagger.SwaggerParameter;
 import com.example.testapi.testattendances.dto.TestAttendanceDto;
+import com.example.testapi.testattendances.dto.TestAttendanceWithCountsDto;
 import com.example.testapi.testattendances.service.TestAttendanceService;
 import com.example.testapi.testlikes.dto.TestLikeDto;
 import com.example.testapi.testlikes.service.TestLikeService;
@@ -95,7 +96,7 @@ public class TestAttendanceController {
         )
     )
     @GetMapping
-    public ResponseEntity<List<TestAttendanceDto.Response>> getAllAttendances() {
+    public ResponseEntity<List<TestAttendanceWithCountsDto>> getAllAttendances() {
         return ResponseEntity.ok(testAttendanceService.getAllAttendances());
     }
 
@@ -150,8 +151,8 @@ public class TestAttendanceController {
         )
     )
     @GetMapping("/{testAttendanceId}")
-    public ResponseEntity<TestAttendanceDto.DetailResponse> getAttendanceDetail(
-            @PathVariable String testAttendanceId) {
+    public ResponseEntity<List<TestAttendanceDto.DetailResponse>> getAttendanceDetail(
+            @PathVariable Long testAttendanceId) {
         return ResponseEntity.ok(testAttendanceService.getAttendanceDetail(testAttendanceId));
     }
 

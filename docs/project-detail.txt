@@ -33,7 +33,10 @@
 - swagger-ui
     - 사용할시에는 실제 메서드 내에 파라미터를 지저분하게 하지 않고 메서드 상단에 @Operation @Parameters 등의 어노테이션을 붙여서 사용한다.
     - swagger-ui example값은 중복을 피하기위해 SwaggerParameter.java를 정의하고 상수를 가져와서 사용한다.
-
+- jpaRepository 등 database에서 result를 조회해오는 경우 반드시 DTO 클래스를 생성하여 해당 클래스로 필요한 필드/로우들을 조회한다.
+- 예외처리
+    - UserException.java가 없다면 만들고 있다면 해당 Exception을 통해 400 에러를 통제하라
+    - RuntimeExcetion 같은 경우에는 500으로 반환하고 서버에서 예상치 못한 에라가 발생했다고 해라 그리고 그 아래에 실제 버그의 stackTrace를 남겨라(차후 운영에서는 남겨지지 않도록 처리)
 
 # 도메인
 ## 개요
