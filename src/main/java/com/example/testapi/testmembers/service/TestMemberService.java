@@ -8,6 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -26,7 +29,7 @@ public class TestMemberService {
         }
 
         TestMember savedMember = testMemberRepository.save(testMember);
-        
+
         TestMemberDto.Response response = new TestMemberDto.Response();
         response.setTestMemberId(savedMember.getTestMemberId());
         response.setTestMemberName(savedMember.getTestMemberName());
@@ -63,5 +66,15 @@ public class TestMemberService {
             throw new RuntimeException("Member not found");
         }
         testMemberRepository.deleteById(testMemberId);
+    }
+
+    public List<TestMemberDto.Response> getAllMembers() {
+        return testMemberRepository.findAll()
+                .stream()
+                .map(testMember -> TestMemberDto.Response.builder()
+                        .testMemberId(testMember.getTestMemberId())
+                        .testMemberName(testMember.getTestMemberName())
+                        .build())
+                .collect(Collectors.toList());
     }
 }

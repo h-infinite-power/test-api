@@ -15,6 +15,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Tag(name = "구성원 API")
 @RestController
 @RequestMapping("/test-api/test-members")
@@ -58,6 +60,35 @@ public class TestMemberController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(testMemberService.createMember(request));
+    }
+
+    @Operation(
+        summary = "구성원 전체 조회",
+        description = "모든 구성원 목록을 조회합니다."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "구성원 전체 조회 성공",
+        content = @Content(
+            mediaType = MediaType.APPLICATION_JSON_VALUE,
+            examples = @ExampleObject(
+                value = """
+                    [
+                      {
+                        "testMemberId": 1,
+                        "testMemberName": "홍길동"
+                      },
+                      {
+                        "testMemberId": 2,
+                        "testMemberName": "김철수"
+                      }
+                    ]"""
+            )
+        )
+    )
+    @GetMapping
+    public ResponseEntity<List<TestMemberDto.Response>> getAllMembers() {
+        return ResponseEntity.ok(testMemberService.getAllMembers());
     }
 
     @Operation(
