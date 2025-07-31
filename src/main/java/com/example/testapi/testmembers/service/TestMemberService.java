@@ -18,8 +18,13 @@ public class TestMemberService {
     public TestMemberDto.Response createMember(TestMemberDto.Request request) {
         TestMember testMember = new TestMember();
         testMember.setTestMemberId(IdGenerator.generateId());
-        testMember.setTestMemberName(request.getTestMemberName());
-        
+        final String testMemberName = request.getTestMemberName();
+        testMember.setTestMemberName(testMemberName);
+
+        if (testMemberRepository.existsByTestMemberName(testMemberName)) {
+            throw new RuntimeException("동일한 이름의 멤버가 존재합니다. -> 동명이인은 무시됩니다.");
+        }
+
         TestMember savedMember = testMemberRepository.save(testMember);
         
         TestMemberDto.Response response = new TestMemberDto.Response();
