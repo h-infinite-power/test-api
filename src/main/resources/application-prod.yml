@@ -2,8 +2,6 @@ spring:
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-  profiles:
-    active: prod
   jpa:
     hibernate:
       ddl-auto: validate
