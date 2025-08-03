@@ -57,7 +57,7 @@ jobs:
             sleep 5
 
             # nohup 실행
-            nohup java -jar /home/${{ secrets.SERVER_USER }}/app/test-api.jar --spring.profiles.active=prod --db.config="$DB_CONFIG_JSON" > app.log 2>&1 &
+            nohup java -jar /home/${{ secrets.SERVER_USER }}/app/test-api.jar --spring.profiles.active=prod > app.log 2>&1 &
 
             # 애플리케이션 시작 대기
             sleep 15

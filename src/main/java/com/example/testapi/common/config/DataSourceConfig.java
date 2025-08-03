@@ -1,6 +1,7 @@
 package com.example.testapi.common.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +17,7 @@ import java.util.Map;
  */
 @Configuration
 @Profile("!local")
+@RequiredArgsConstructor
 public class DataSourceConfig {
 
     @Value("${DB_CONFIG_JSON:}")
@@ -29,7 +31,6 @@ public class DataSourceConfig {
      * @throws Exception JSON 파싱 오류 또는 설정 오류 시 예외 발생
      */
     @Bean
-    @Profile("!local & !dev")
     public DataSource dataSource() throws Exception {
         if (dbConfigJson == null || dbConfigJson.trim().isEmpty()) {
             throw new IllegalArgumentException("DB_CONFIG_JSON 환경변수가 설정되지 않았습니다.");
