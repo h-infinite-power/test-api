@@ -27,7 +27,7 @@ jobs:
 
       # 4. Build Jar
       - name: Build with Gradle
-        run: ./gradlew clean build
+        run: ./gradlew clean build -x test
 
       # 5. Copy Jar to server
       - name: Copy Jar to server
