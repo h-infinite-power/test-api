@@ -1,6 +1,6 @@
 # 패키지 구조
 - table name으로 디렉터리가 분리되고 controller, service, repository, entity, dto 등은 각각의 패키지로 분리되어 있음
-- ex)
+- ex) # TODO : example을 com.human.infinite.power.domain으로 변경 필요  
   - com.example.testattendances.controller
   - com.example.testattendances.service
   - com.example.testattendances.repository
@@ -11,9 +11,25 @@
 # DB
 ## JPA
 - Repository의 경우 JpaRepository를 상속받아 사용하며 간단한 경우 이름메서드로 처리함
-  - join이 들어가는 경우 이름 메서드를 사용하지 않고 @Query(nativeQuery = true)로 작성함
-- entity 클래스는 @Entity 어노테이션을 사용하여 정의하며 class명은 테이블이름의 복수형 s를 제외한 형태임, 테이블 이름은 TableName 어노테이션으로 지정함
-- 모든 table row 생성시에 id는 시계열에 따른 id를 얻어내는 전역 static 메서드를 통해 생성한다.(중복이 최대한 되지 않도록, 시계열 생성이므로 아이디의 순차적인 오름차순은 유지됨)
+  - join이 들어가는 경우 이름 메서드를 사용하지 않고 @Query 이용하여 JPQL로 작성함 
+  - Controller로 entity가 넘어가서는 안되며 필요한 경우에는 DomainResponseDto를 만들어서 반환
+- entity 클래스는 @Entity 어노테이션을 사용하여 정의하며 테이블 이름은 TableName 어노테이션으로 지정함
+  - 모든 table row 생성시에 id는 시계열에 따른 id를 얻어내는 전역 static 메서드를 통해 생성한다.(중복이 최대한 되지 않도록, 시계열 생성이므로 아이디의 순차적인 오름차순은 유지됨)
+    ``` java
+      public class IdGenerator {
+            private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+            private static final AtomicInteger sequence = new AtomicInteger(0);
+      
+            private static final long UTC_EPOCH_2020 = 1577836800000L;
+            private static final int SHIFT_BIT = 23;
+            private static final int BIT_23_VALUE = 0x800000;
+      
+            public static Long generateId() {
+                long sub = System.currentTimeMillis() - UTC_EPOCH_2020;
+                return (sub << SHIFT_BIT) + new SecureRandom().nextInt(BIT_23_VALUE);
+            }
+      }
+    ```
 - 생성하는 모든 메서드에는 자바독을 만들고, 메서드의 길이는 15~20줄로 제한한다.
 - 계산이 복잡한 내용이 있을 경우 매 줄마다 주석을 달아서 이해하기 쉽게 한다.
 - jpaRepository 등 database에서 result를 조회해오는 경우 반드시 DTO 클래스를 생성하여 해당 클래스로 필요한 필드/로우들을 조회한다.
