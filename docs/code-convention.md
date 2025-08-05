@@ -6,7 +6,7 @@
   - com.example.testattendances.repository
   - com.example.testattendances.entity
   - com.example.testattendances.dto
-- 각 패키지 내에서는 관련된 클래스들끼리 묶어서 관리함
+- 각 패키지 내에서는 관련된 클래스들끼리 묶어서 관리함.
 
 # DB
 ## JPA
