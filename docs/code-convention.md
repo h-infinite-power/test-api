@@ -29,10 +29,12 @@
                 return (sub << SHIFT_BIT) + new SecureRandom().nextInt(BIT_23_VALUE);
             }
       }
-    ```
+    ``
 - 생성하는 모든 메서드에는 자바독을 만들고, 메서드의 길이는 15~20줄로 제한한다.
 - 계산이 복잡한 내용이 있을 경우 매 줄마다 주석을 달아서 이해하기 쉽게 한다.
 - jpaRepository 등 database에서 result를 조회해오는 경우 반드시 DTO 클래스를 생성하여 해당 클래스로 필요한 필드/로우들을 조회한다.
+- 복잡한 쿼리의 경우  jpql로 join fetch 하여 entity를 반환한다. 이후 entity는 서비스단에서 DTO class로 변환하여 controller로 반환한다. 
+- querydsl은 절대 사용하지 않는다.
 
 # swagger
 - 사용할시에는 실제 메서드 내에 파라미터를 지저분하게 하지 않고 메서드 상단에 @Operation @Parameters 등의 어노테이션을 붙여서 사용한다.
