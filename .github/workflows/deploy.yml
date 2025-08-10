@@ -1,4 +1,4 @@
-name: Deploy Spring Boot
+name: Deploy reportly-api
 
 on:
   push:
@@ -8,6 +8,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      APP_NAME: reportly-api         # 원하는 서비스 이름
+      APP_PORT: 8080                 # 스프링 부트 리스닝 포트
+      CONTEXT_PATH: ""               # 예) "/reportly-api" 쓰면 내부 헬스도 그 경로로 확인
 
     steps:
       - name: Checkout code
@@ -25,7 +29,7 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew clean build -x test
 
-      # JAR 업로드
+      # 실행가능 JAR 업로드(plain 제외는 원격 선택 단계에서 처리)
       - name: Upload JAR to server
         uses: appleboy/scp-action@v1
         with:
@@ -34,112 +38,92 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: "build/libs/*.jar"
           target: "/home/${{ secrets.SERVER_USER }}/app/"
-          strip_components: 2
           overwrite: true
 
-      # 1) 서버에서 기존 프로세스 정지
+      # 기존 프로세스 정지
       - name: Stop existing app (if any)
         uses: appleboy/ssh-action@v1
+        env:
+          APP_NAME: ${{ env.APP_NAME }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          command_timeout: 15m
+          envs: APP_NAME
+          command_timeout: 10m
           script: |
             bash -lc '
               set -Eeuo pipefail
-
               APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
-              JAR_NAME="test-api.jar"
+              JAR_NAME="${APP_NAME}.jar"
 
-              mkdir -p "$APP_DIR"
-
-              # 자바로 실행된 해당 JAR 프로세스만 타겟팅
+              # 자바로 실행된 해당 JAR만 종료
               PIDS="$(pgrep -f "java .*${JAR_NAME}" || true)"
               if [ -z "$PIDS" ]; then
                 echo "실행 중인 프로세스 없음."
                 exit 0
               fi
 
-              echo "기존 프로세스 종료 중..."
+              echo "기존 프로세스 종료..."
               kill $PIDS || true
-
-              # TERM으로 최대 15초 기다림
-              for i in $(seq 1 15); do
-                if ! pgrep -f "java .*${JAR_NAME}" >/dev/null 2>&1; then
-                  break
-                fi
-                sleep 1
-              done
-
-              if pgrep -f "java .*${JAR_NAME}" >/dev/null 2>&1; then
-                echo "강제 종료(SIGKILL) 시도..."
-                kill -9 $PIDS || true
-              fi
-
+              for i in $(seq 1 15); do pgrep -f "java .*${JAR_NAME}" >/dev/null || break; sleep 1; done
+              pgrep -f "java .*${JAR_NAME}" >/dev/null && { echo "SIGKILL..."; kill -9 $PIDS || true; }
               echo "정지 완료"
             '
 
-      # 2) 시작 + 헬스체크
-      - name: Start app and health check
+      # 시작 + 내부 헬스체크
+      - name: Start app and internal healthcheck
         uses: appleboy/ssh-action@v1
         env:
-          DB_CONFIG_JSON: ${{ secrets.DB_CONFIG_JSON }}
+          APP_NAME: ${{ env.APP_NAME }}
+          APP_PORT: ${{ env.APP_PORT }}
+          CONTEXT_PATH: ${{ env.CONTEXT_PATH }}
+          DB_CONFIG_JSON: ${{ secrets.DB_CONFIG_JSON }}   # 쓰는 경우만
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          envs: DB_CONFIG_JSON
-          command_timeout: 15m
+          envs: APP_NAME,APP_PORT,CONTEXT_PATH,DB_CONFIG_JSON
+          command_timeout: 20m
           script: |
             bash -lc '
               set -Eeuo pipefail
 
               APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
-              JAR_NAME="test-api.jar"
-              PID_FILE="$APP_DIR/${JAR_NAME}.pid"
+              JAR_NAME="${APP_NAME}.jar"
               LOG_FILE="$APP_DIR/app.log"
 
               mkdir -p "$APP_DIR"
 
-              LATEST_JAR=$(ls -t "$APP_DIR"/*.jar 2>/dev/null | head -n1 || true)
-              if [ -z "$LATEST_JAR" ]; then
-                echo "❌ JAR 파일을 찾을 수 없습니다: $APP_DIR"
+              echo "업로드된 JAR 목록:"
+              ls -lh "$APP_DIR"/*.jar || true
+
+              # -plain.jar 제외한 최신 JAR 선택
+              CANDIDATE="$(ls -t "$APP_DIR"/*.jar 2>/dev/null | grep -v -- "-plain\.jar$" | head -n1 || true)"
+              if [ -z "$CANDIDATE" ]; then
+                echo "❌ 실행가능 JAR을 찾지 못했습니다. (build/libs/*-plain.jar 제외 여부 확인)"
                 exit 1
               fi
-              cp -f "$LATEST_JAR" "$APP_DIR/$JAR_NAME"
+
+              # JAR 이름과 같은 '디렉터리'가 남아 있으면 제거 (여기서 에러의 근본 원인을 해결)
+              if [ -d "$APP_DIR/$JAR_NAME" ]; then
+                echo "⚠️ $APP_DIR/$JAR_NAME 가 디렉터리입니다. 제거합니다."
+                rm -rf "$APP_DIR/$JAR_NAME"
+              fi
+
+              # 대상 파일 덮어쓰기
+              cp -f "$CANDIDATE" "$APP_DIR/$JAR_NAME"
+
+              # 간단 무결성 점검 (zip 헤더)
+              if ! file "$APP_DIR/$JAR_NAME" | grep -qi "zip archive"; then
+                echo "❌ 손상된 JAR로 보입니다: $(file "$APP_DIR/$JAR_NAME")"
+                exit 1
+              fi
 
               echo "애플리케이션 시작..."
               nohup java -jar "$APP_DIR/$JAR_NAME" --spring.profiles.active=prod > "$LOG_FILE" 2>&1 &
-              echo $! > "$PID_FILE"
 
-              echo "헬스체크 시작..."
-              for i in $(seq 1 10); do
-                if curl -fsS https://h-infinite-power.store/test-api/health >/dev/null; then
-                  echo "✅ 애플리케이션이 정상적으로 시작되었습니다."
-                  exit 0
-                fi
-                echo "헬스체크 실패, 재시도 중... ($i/10)"
-                sleep 10
-              done
-
-              echo "❌ 애플리케이션 시작 실패"
-              echo "---- last 200 lines of app.log ----"
-              tail -n 200 "$LOG_FILE" || true
-              exit 1
-            '
-
-      # 실패 시 서버 로그 출력
-      - name: Print server logs on failure
-        if: failure()
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            bash -lc '
-              LOG_FILE="/home/${{ secrets.SERVER_USER }}/app/app.log"
-              echo "---- last 400 lines of app.log ----"
-              tail -n 400 "$LOG_FILE" || echo "log file not found"
-            '
+              echo "포트 오픈 대기..."
+              for i in $(seq 1 30); do
+                ss -ltn 2>/dev/null | awk "{print \$4}" | grep -q ":${APP_PORT}$" && break
+                if command -v netstat >/dev/
