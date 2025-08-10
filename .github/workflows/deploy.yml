@@ -9,9 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      APP_NAME: reportly-api         # 원하는 서비스 이름
-      APP_PORT: 8080                 # 스프링 부트 리스닝 포트
-      CONTEXT_PATH: ""               # 예) "/reportly-api" 쓰면 내부 헬스도 그 경로로 확인
+      APP_NAME: reportly-api   # 서비스 이름(파일명: reportly-api.jar)
+      APP_PORT: 8080           # Spring Boot 리스닝 포트
+      CONTEXT_PATH: ""         # 예: "/reportly-api"라면 내부 헬스도 그 경로로 확인
 
     steps:
       - name: Checkout code
@@ -29,8 +29,8 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew clean build -x test
 
-      # 실행가능 JAR 업로드(plain 제외는 원격 선택 단계에서 처리)
-      - name: Upload JAR to server
+      # 모든 JAR 업로드(plain 포함). 실행은 서버에서 'bootJar'만 선별해서 사용.
+      - name: Upload JARs to server
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -40,7 +40,7 @@ jobs:
           target: "/home/${{ secrets.SERVER_USER }}/app/"
           overwrite: true
 
-      # 기존 프로세스 정지
+      # 1) 기존 프로세스 정지
       - name: Stop existing app (if any)
         uses: appleboy/ssh-action@v1
         env:
@@ -54,10 +54,11 @@ jobs:
           script: |
             bash -lc '
               set -Eeuo pipefail
+
               APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
               JAR_NAME="${APP_NAME}.jar"
 
-              # 자바로 실행된 해당 JAR만 종료
+              # 해당 JAR로 실행된 Java만 종료
               PIDS="$(pgrep -f "java .*${JAR_NAME}" || true)"
               if [ -z "$PIDS" ]; then
                 echo "실행 중인 프로세스 없음."
@@ -71,7 +72,7 @@ jobs:
               echo "정지 완료"
             '
 
-      # 시작 + 내부 헬스체크
+      # 2) 시작 + 내부 헬스체크
       - name: Start app and internal healthcheck
         uses: appleboy/ssh-action@v1
         env:
@@ -95,30 +96,35 @@ jobs:
 
               mkdir -p "$APP_DIR"
 
-              echo "업로드된 JAR 목록:"
+              echo "== 업로드된 JAR 목록 =="
               ls -lh "$APP_DIR"/*.jar || true
 
-              # -plain.jar 제외한 최신 JAR 선택
+              # 최신 JAR 중 -plain 제외
               CANDIDATE="$(ls -t "$APP_DIR"/*.jar 2>/dev/null | grep -v -- "-plain\.jar$" | head -n1 || true)"
               if [ -z "$CANDIDATE" ]; then
-                echo "❌ 실행가능 JAR을 찾지 못했습니다. (build/libs/*-plain.jar 제외 여부 확인)"
+                echo "❌ 실행가능 JAR(bootJar)을 찾지 못했습니다."
                 exit 1
               fi
 
-              # JAR 이름과 같은 '디렉터리'가 남아 있으면 제거 (여기서 에러의 근본 원인을 해결)
+              # 같은 이름의 디렉터리(예: test-api.jar 디렉터리)가 있으면 제거
               if [ -d "$APP_DIR/$JAR_NAME" ]; then
                 echo "⚠️ $APP_DIR/$JAR_NAME 가 디렉터리입니다. 제거합니다."
                 rm -rf "$APP_DIR/$JAR_NAME"
               fi
 
-              # 대상 파일 덮어쓰기
-              cp -f "$CANDIDATE" "$APP_DIR/$JAR_NAME"
-
-              # 간단 무결성 점검 (zip 헤더)
-              if ! file "$APP_DIR/$JAR_NAME" | grep -qi "zip archive"; then
-                echo "❌ 손상된 JAR로 보입니다: $(file "$APP_DIR/$JAR_NAME")"
+              # 무결성/실행가능 점검: zip 헤더 + BOOT-INF 포함(=bootJar)
+              if ! file "$CANDIDATE" | grep -qi "zip archive"; then
+                echo "❌ 손상 의심 JAR: $(file "$CANDIDATE")"
                 exit 1
               fi
+              # jar 도구로 BOOT-INF 확인(= 실행가능 부트 JAR)
+              if ! jar tf "$CANDIDATE" | grep -q "^BOOT-INF/"; then
+                echo "❌ BOOT-INF 미검출 → plain JAR입니다. 실행 불가."
+                exit 1
+              fi
+
+              # 대상 파일로 배치
+              cp -f "$CANDIDATE" "$APP_DIR/$JAR_NAME"
 
               echo "애플리케이션 시작..."
               nohup java -jar "$APP_DIR/$JAR_NAME" --spring.profiles.active=prod > "$LOG_FILE" 2>&1 &
@@ -126,4 +132,55 @@ jobs:
               echo "포트 오픈 대기..."
               for i in $(seq 1 30); do
                 ss -ltn 2>/dev/null | awk "{print \$4}" | grep -q ":${APP_PORT}$" && break
-                if command -v netstat >/dev/
+                if command -v netstat >/dev/null 2>&1 && netstat -ltn 2>/dev/null | awk "{print \$4}" | grep -q ":${APP_PORT}$"; then
+                  break
+                fi
+                sleep 2
+              done
+
+              # 내부 헬스(도메인 대신 127.0.0.1로 200 확인)
+              CP="${CONTEXT_PATH:-}"
+              INTERNAL_URLS=(
+                "http://127.0.0.1:${APP_PORT}${CP}/actuator/health"
+                "http://127.0.0.1:${APP_PORT}${CP}/health"
+              )
+              echo "내부 헬스체크 시작..."
+              ok=""
+              for i in $(seq 1 20); do
+                for url in "${INTERNAL_URLS[@]}"; do
+                  code=$(curl -s -o /dev/null -w "%{http_code}" "$url" || true)
+                  echo "HTTP $code - $url"
+                  [ "$code" = "200" ] && { ok=1; break; }
+                done
+                [ -n "$ok" ] && break
+                sleep 3
+              done
+
+              if [ -z "$ok" ]; then
+                echo "❌ 내부 헬스체크 실패. 최근 로그:"
+                tail -n 200 "$LOG_FILE" || true
+                exit 1
+              fi
+
+              echo "✅ 내부 헬스 OK"
+            '
+
+      # 실패 시 서버 로그 출력
+      - name: Print server logs on failure
+        if: failure()
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            bash -lc '
+              APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
+              LOG_FILE="$APP_DIR/app.log"
+              echo "== JARs =="
+              ls -lh "$APP_DIR"/*.jar || true
+              echo "== file =="
+              file "$APP_DIR"/*.jar || true
+              echo "== tail log =="
+              tail -n 400 "$LOG_FILE" || echo "log file not found"
+            '
