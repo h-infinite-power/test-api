@@ -1,4 +1,4 @@
-name: Deploy Spring Boot
+name: Deploy reportly-api
 
 on:
   push:
@@ -6,8 +6,11 @@ on:
 
 jobs:
   build:
+    name: reportly-api build & deploy
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      APP_NAME: reportly-api   # <- 여기만 바꾸면 JAR/URL 전부 따라 바뀜
 
     steps:
       - name: Checkout code
@@ -50,11 +53,11 @@ jobs:
               set -Eeuo pipefail
 
               APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
-              JAR_NAME="test-api.jar"
+              JAR_NAME="${APP_NAME}.jar"
 
               mkdir -p "$APP_DIR"
 
-              # 자바로 실행된 해당 JAR 프로세스만 타겟팅
+              # 자바로 실행된 해당 JAR 프로세스만 타겟팅 (bash 자기자신 매치 방지)
               PIDS="$(pgrep -f "java .*${JAR_NAME}" || true)"
               if [ -z "$PIDS" ]; then
                 echo "실행 중인 프로세스 없음."
@@ -96,7 +99,7 @@ jobs:
               set -Eeuo pipefail
 
               APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
-              JAR_NAME="test-api.jar"
+              JAR_NAME="${APP_NAME}.jar"
               PID_FILE="$APP_DIR/${JAR_NAME}.pid"
               LOG_FILE="$APP_DIR/app.log"
 
@@ -114,8 +117,9 @@ jobs:
               echo $! > "$PID_FILE"
 
               echo "헬스체크 시작..."
+              # 필요 시 URL 수정: /${APP_NAME}/health 경로를 쓰지 않는다면 아래 줄만 바꾸세요.
               for i in $(seq 1 10); do
-                if curl -fsS https://h-infinite-power.store/test-api/health >/dev/null; then
+                if curl -fsS "https://h-infinite-power.store/${APP_NAME}/health" >/dev/null; then
                   echo "✅ 애플리케이션이 정상적으로 시작되었습니다."
                   exit 0
                 fi
