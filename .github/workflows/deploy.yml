@@ -9,9 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      APP_NAME: reportly-api   # 실행 파일명: reportly-api.jar
-      APP_PORT: 8080           # Spring Boot 포트
-      CONTEXT_PATH: ""         # 사용 안 해도 됨(남겨둠)
+      APP_NAME: reportly-api
+      APP_PORT: 8080
 
     steps:
       - name: Checkout code
@@ -29,7 +28,7 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew clean build -x test
 
-      # 모든 JAR 업로드(plain 포함). 실행은 서버에서 bootJar만 선별.
+      # JAR 업로드: build/libs 경로를 잘라 app/ 바로 아래에 두기
       - name: Upload JARs to server
         uses: appleboy/scp-action@v1
         with:
@@ -38,9 +37,9 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: "build/libs/*.jar"
           target: "/home/${{ secrets.SERVER_USER }}/app/"
+          strip_components: 2
           overwrite: true
 
-      # 1) 기존 프로세스 정지
       - name: Stop existing app (if any)
         uses: appleboy/ssh-action@v1
         env:
@@ -54,11 +53,9 @@ jobs:
           script: |
             bash -lc '
               set -Eeuo pipefail
-
               APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
               JAR_NAME="${APP_NAME}.jar"
 
-              # 해당 JAR로 실행된 Java만 종료
               PIDS="$(pgrep -f "java .*${JAR_NAME}" || true)"
               if [ -z "$PIDS" ]; then
                 echo "실행 중인 프로세스 없음."
@@ -72,57 +69,57 @@ jobs:
               echo "정지 완료"
             '
 
-      # 2) 시작 + 내부 연결만 확인(127.0.0.1:8080)
       - name: Start app and port healthcheck (127.0.0.1:8080)
         uses: appleboy/ssh-action@v1
         env:
           APP_NAME: ${{ env.APP_NAME }}
           APP_PORT: ${{ env.APP_PORT }}
-          CONTEXT_PATH: ${{ env.CONTEXT_PATH }}
-          DB_CONFIG_JSON: ${{ secrets.DB_CONFIG_JSON }}   # 쓰는 경우만
+          DB_CONFIG_JSON: ${{ secrets.DB_CONFIG_JSON }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          envs: APP_NAME,APP_PORT,CONTEXT_PATH,DB_CONFIG_JSON
+          envs: APP_NAME,APP_PORT,DB_CONFIG_JSON
           command_timeout: 20m
           script: |
             bash -lc '
               set -Eeuo pipefail
-
               APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
               JAR_NAME="${APP_NAME}.jar"
               LOG_FILE="$APP_DIR/app.log"
 
               mkdir -p "$APP_DIR"
-
-              echo "== 업로드된 JAR 목록 =="
+              echo "== app 디렉터리 =="
+              ls -lh "$APP_DIR" || true
+              echo "== JAR 목록 (app 바로 아래) =="
               ls -lh "$APP_DIR"/*.jar || true
 
               # 최신 JAR 중 -plain 제외
               CANDIDATE="$(ls -t "$APP_DIR"/*.jar 2>/dev/null | grep -v -- "-plain\.jar$" | head -n1 || true)"
               if [ -z "$CANDIDATE" ]; then
-                echo "❌ 실행가능 JAR(bootJar)을 찾지 못했습니다."
+                echo "❌ 실행가능 JAR(bootJar)을 찾지 못했습니다. 업로드 위치를 확인하세요."
                 exit 1
               fi
 
-              # JAR 이름과 같은 디렉터리가 있으면 제거(과거 디렉터리 충돌 방지)
+              # 충돌 방지: 같은 이름의 디렉터리가 있으면 제거
               if [ -d "$APP_DIR/$JAR_NAME" ]; then
                 echo "⚠️ $APP_DIR/$JAR_NAME 가 디렉터리입니다. 제거합니다."
                 rm -rf "$APP_DIR/$JAR_NAME"
               fi
 
-              # 무결성/실행가능 점검: zip 헤더 + BOOT-INF 포함(=bootJar)
+              # 무결성/실행가능 점검
               if ! file "$CANDIDATE" | grep -qi "zip archive"; then
                 echo "❌ 손상 의심 JAR: $(file "$CANDIDATE")"
                 exit 1
               fi
-              if ! jar tf "$CANDIDATE" | grep -q "^BOOT-INF/"; then
-                echo "❌ BOOT-INF 미검출 → plain JAR입니다. 실행 불가."
-                exit 1
+              if command -v jar >/dev/null 2>&1; then
+                jar tf "$CANDIDATE" | grep -q "^BOOT-INF/" || { echo "❌ BOOT-INF 미검출 → plain JAR"; exit 1; }
+              elif command -v unzip >/dev/null 2>&1; then
+                unzip -l "$CANDIDATE" | grep -q "BOOT-INF/" || { echo "❌ BOOT-INF 미검출 → plain JAR"; exit 1; }
+              else
+                echo "⚠️ jar/unzip 없음. 무결성 최소 확인만 진행합니다."
               fi
 
-              # 대상 파일로 배치
               cp -f "$CANDIDATE" "$APP_DIR/$JAR_NAME"
 
               echo "애플리케이션 시작..."
@@ -130,26 +127,14 @@ jobs:
 
               echo "포트 오픈 대기..."
               for i in $(seq 1 30); do
-                ss -ltn 2>/dev/null | awk "{print \$4}" | grep -q ":${APP_PORT}$" && port_open=1 || port_open=""
-                if [ -n "$port_open" ]; then break; fi
-                if command -v netstat >/dev/null 2>&1; then
-                  netstat -ltn 2>/dev/null | awk "{print \$4}" | grep -q ":${APP_PORT}$" && break
+                ss -ltn 2>/dev/null | awk "{print \$4}" | grep -q ":${APP_PORT}$" && break
+                if command -v netstat >/dev/null 2>&1 && netstat -ltn 2>/dev/null | awk "{print \$4}" | grep -q ":${APP_PORT}$"; then
+                  break
                 fi
                 sleep 2
               done
 
-              # 포트가 정말 열렸는지 최종 확인
-              if ! ss -ltn 2>/dev/null | awk "{print \$4}" | grep -q ":${APP_PORT}$"; then
-                if command -v netstat >/dev/null 2>&1 && netstat -ltn 2>/dev/null | awk "{print \$4}" | grep -q ":${APP_PORT}$"; then
-                  :
-                else
-                  echo "❌ 포트 ${APP_PORT} 오픈 확인 실패. 최근 로그:"
-                  tail -n 200 "$LOG_FILE" || true
-                  exit 1
-                fi
-              fi
-
-              # 단순 연결 확인: 127.0.0.1:${APP_PORT} 로 HTTP 요청(응답 코드 무관, 연결만 되면 성공)
+              # 127.0.0.1:${APP_PORT} 연결만 확인(응답코드 무관)
               echo "127.0.0.1:${APP_PORT} 연결 확인..."
               ok=""
               for i in $(seq 1 20); do
@@ -168,7 +153,6 @@ jobs:
               echo "✅ 포트 ${APP_PORT} 연결 OK"
             '
 
-      # 실패 시 서버 로그 출력
       - name: Print server logs on failure
         if: failure()
         uses: appleboy/ssh-action@v1
@@ -180,10 +164,9 @@ jobs:
             bash -lc '
               APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
               LOG_FILE="$APP_DIR/app.log"
-              echo "== JARs =="
+              echo "== app 디렉터리 =="
+              ls -lh "$APP_DIR" || true
+              echo "== JARs (app/) =="
               ls -lh "$APP_DIR"/*.jar || true
               echo "== file =="
-              file "$APP_DIR"/*.jar || true
-              echo "== tail log =="
-              tail -n 400 "$LOG_FILE" || echo "log file not found"
-            '
+              file "$APP_DIR"/*.jar || true*_
