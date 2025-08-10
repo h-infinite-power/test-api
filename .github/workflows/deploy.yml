@@ -1,42 +1,94 @@
-- name: Deploy on server
-  uses: appleboy/ssh-action@v1
-  with:
-    host: ${{ secrets.SERVER_HOST }}
-    username: ${{ secrets.SERVER_USER }}
-    key: ${{ secrets.SERVER_SSH_KEY }}
-    # 디버그/타임아웃(선택)
-    debug: true
-    command_timeout: 15m
-    # GitHub env를 원격 스크립트에 전달할 목록
-    envs: DB_CONFIG_JSON
-    script: |
-      set -e  # v1에서 script_stop 대체
-      APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
-      JAR_NAME="test-api.jar"
-      LOG_FILE="$APP_DIR/app.log"
+name: Deploy Spring Boot
 
-      mkdir -p "$APP_DIR"
+on:
+  push:
+    branches: [ main ]
 
-      # 1) 이전 프로세스 종료(없으면 무시)
-      pkill -f "$JAR_NAME" || true
-      sleep 3
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-      # 2) 백그라운드 기동: 세션과 완전히 분리
-      echo "애플리케이션 재시작..."
-      nohup java -jar "$APP_DIR/$JAR_NAME" --spring.profiles.active=prod \
-        </dev/null >> "$LOG_FILE" 2>&1 & disown || true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      # 3) 헬스체크 (성공 시 0으로 명시 종료)
-      echo "헬스체크 시작..."
-      for i in {1..10}; do
-        if curl -fsS https://h-infinite-power.store/test-api/health; then
-          echo "✅ 애플리케이션이 정상적으로 시작되었습니다."
-          exit 0
-        fi
-        echo "헬스체크 실패, 재시도 중... ($i/10)"
-        sleep 10
-      done
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-      echo "❌ 애플리케이션 시작 실패"
-      tail -n 200 "$LOG_FILE" || true
-      exit 1
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew clean build -x test
+
+      # 5) JAR 업로드: target은 '디렉터리', strip_components로 build/libs 제거
+      - name: Upload JAR to server
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "build/libs/*.jar"
+          target: "/home/${{ secrets.SERVER_USER }}/app/"
+          strip_components: 2
+          overwrite: true
+
+      # 6) 서버에서 배포/기동
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1
+        env:
+          DB_CONFIG_JSON: ${{ secrets.DB_CONFIG_JSON }}   # 안전하게 env로 전달
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -euo pipefail
+
+            APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
+            JAR_NAME="test-api.jar"
+            LOG_FILE="$APP_DIR/app.log"
+
+            mkdir -p "$APP_DIR"
+
+            # 방금 업로드된 최신 JAR를 고정 파일명으로 교체
+            LATEST_JAR=$(ls -t "$APP_DIR"/*.jar | head -n1)
+            cp -f "$LATEST_JAR" "$APP_DIR/$JAR_NAME"
+
+            # 기존 프로세스 종료(없으면 무시)
+            pkill -f "$JAR_NAME" || true
+            sleep 3
+
+            echo "애플리케이션 재시작..."
+            nohup java -jar "$APP_DIR/$JAR_NAME" --spring.profiles.active=prod > "$LOG_FILE" 2>&1 &
+
+            echo "헬스체크 시작..."
+            for i in {1..10}; do
+              if curl -fsS https://h-infinite-power.store/test-api/health; then
+                echo "✅ 애플리케이션이 정상적으로 시작되었습니다."
+                exit 0
+              fi
+              echo "헬스체크 실패, 재시도 중... ($i/10)"
+              sleep 10
+            done
+
+            echo "❌ 애플리케이션 시작 실패"
+            echo "---- last 200 lines of app.log ----"
+            tail -n 200 "$LOG_FILE" || true
+            exit 1
+
+      # 7) 실패 시 서버 로그를 '출력' (다운로드 아님)
+      - name: Print server logs on failure
+        if: failure()
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            LOG_FILE="/home/${{ secrets.SERVER_USER }}/app/app.log"
+            echo "---- last 400 lines of app.log ----"
+            tail -n 400 "$LOG_FILE" || echo "log file not found"
