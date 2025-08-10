@@ -28,7 +28,27 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew clean build -x test
 
-      # JAR 업로드: build/libs 경로를 잘라 app/ 바로 아래에 두기
+      # 원격 디렉터리 준비 (없으면 생성)
+      - name: Prepare remote folders
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_NAME: ${{ env.APP_NAME }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: APP_NAME
+          script: |
+            bash -lc '
+              set -Eeuo pipefail
+              APP_BASE="/home/${{ secrets.SERVER_USER }}/app/${APP_NAME}"
+              BUILD_DIR="$APP_BASE/build"
+              LOG_DIR="$APP_BASE/log"
+              mkdir -p "$BUILD_DIR" "$LOG_DIR"
+              echo "Prepared: $BUILD_DIR and $LOG_DIR"
+            '
+
+      # JAR 업로드: build/libs 경로를 잘라서 test-api/build 바로 아래에 두기
       - name: Upload JARs to server
         uses: appleboy/scp-action@v1
         with:
@@ -36,10 +56,11 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: "build/libs/*.jar"
-          target: "/home/${{ secrets.SERVER_USER }}/app/"
+          target: "/home/${{ secrets.SERVER_USER }}/app/${{ env.APP_NAME }}/build/"
           strip_components: 2
           overwrite: true
 
+      # 기존 프로세스 정지 (해당 경로의 test-api.jar만)
       - name: Stop existing app (if any)
         uses: appleboy/ssh-action@v1
         env:
@@ -53,10 +74,12 @@ jobs:
           script: |
             bash -lc '
               set -Eeuo pipefail
-              APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
+              APP_BASE="/home/${{ secrets.SERVER_USER }}/app/${APP_NAME}"
+              BUILD_DIR="$APP_BASE/build"
               JAR_NAME="${APP_NAME}.jar"
+              TARGET_JAR="$BUILD_DIR/$JAR_NAME"
 
-              PIDS="$(pgrep -f "java .*${JAR_NAME}" || true)"
+              PIDS="$(pgrep -f "java .*${TARGET_JAR}" || true)"
               if [ -z "$PIDS" ]; then
                 echo "실행 중인 프로세스 없음."
                 exit 0
@@ -64,11 +87,12 @@ jobs:
 
               echo "기존 프로세스 종료..."
               kill $PIDS || true
-              for i in $(seq 1 15); do pgrep -f "java .*${JAR_NAME}" >/dev/null || break; sleep 1; done
-              pgrep -f "java .*${JAR_NAME}" >/dev/null && { echo "SIGKILL..."; kill -9 $PIDS || true; }
+              for i in $(seq 1 15); do pgrep -f "java .*${TARGET_JAR}" >/dev/null || break; sleep 1; done
+              pgrep -f "java .*${TARGET_JAR}" >/dev/null && { echo "SIGKILL..."; kill -9 $PIDS || true; }
               echo "정지 완료"
             '
 
+      # 시작 + 내부 연결 확인(127.0.0.1:8080)
       - name: Start app and port healthcheck (127.0.0.1:8080)
         uses: appleboy/ssh-action@v1
         env:
@@ -84,27 +108,31 @@ jobs:
           script: |
             bash -lc '
               set -Eeuo pipefail
-              APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
+              APP_BASE="/home/${{ secrets.SERVER_USER }}/app/${APP_NAME}"
+              BUILD_DIR="$APP_BASE/build"
+              LOG_DIR="$APP_BASE/log"
               JAR_NAME="${APP_NAME}.jar"
-              LOG_FILE="$APP_DIR/app.log"
+              TARGET_JAR="$BUILD_DIR/$JAR_NAME"
+              LOG_FILE="$LOG_DIR/app.log"
 
-              mkdir -p "$APP_DIR"
-              echo "== app 디렉터리 =="
-              ls -lh "$APP_DIR" || true
-              echo "== JAR 목록 (app 바로 아래) =="
-              ls -lh "$APP_DIR"/*.jar || true
+              mkdir -p "$BUILD_DIR" "$LOG_DIR"
+
+              echo "== build 디렉터리 =="
+              ls -lh "$BUILD_DIR" || true
+              echo "== JAR 목록 (build/) =="
+              ls -lh "$BUILD_DIR"/*.jar || true
 
               # 최신 JAR 중 -plain 제외
-              CANDIDATE="$(ls -t "$APP_DIR"/*.jar 2>/dev/null | grep -v -- "-plain\.jar$" | head -n1 || true)"
+              CANDIDATE="$(ls -t "$BUILD_DIR"/*.jar 2>/dev/null | grep -v -- "-plain\.jar$" | head -n1 || true)"
               if [ -z "$CANDIDATE" ]; then
                 echo "❌ 실행가능 JAR(bootJar)을 찾지 못했습니다. 업로드 위치를 확인하세요."
                 exit 1
               fi
 
-              # 충돌 방지: 같은 이름의 디렉터리가 있으면 제거
-              if [ -d "$APP_DIR/$JAR_NAME" ]; then
-                echo "⚠️ $APP_DIR/$JAR_NAME 가 디렉터리입니다. 제거합니다."
-                rm -rf "$APP_DIR/$JAR_NAME"
+              # 같은 이름의 디렉터리가 있으면 제거(예전 충돌 방지)
+              if [ -d "$TARGET_JAR" ]; then
+                echo "⚠️ $TARGET_JAR 가 디렉터리입니다. 제거합니다."
+                rm -rf "$TARGET_JAR"
               fi
 
               # 무결성/실행가능 점검
@@ -120,10 +148,10 @@ jobs:
                 echo "⚠️ jar/unzip 없음. 무결성 최소 확인만 진행합니다."
               fi
 
-              cp -f "$CANDIDATE" "$APP_DIR/$JAR_NAME"
+              cp -f "$CANDIDATE" "$TARGET_JAR"
 
               echo "애플리케이션 시작..."
-              nohup java -jar "$APP_DIR/$JAR_NAME" --spring.profiles.active=prod > "$LOG_FILE" 2>&1 &
+              nohup java -jar "$TARGET_JAR" --spring.profiles.active=prod > "$LOG_FILE" 2>&1 &
 
               echo "포트 오픈 대기..."
               for i in $(seq 1 30); do
@@ -150,26 +178,32 @@ jobs:
                 exit 1
               fi
 
-              echo "✅ 포트 ${APP_PORT} 연결 OK"
+              echo "✅ 포트 ${APP_PORT} 연결 OK (로그: $LOG_FILE)"
             '
 
+      # 실패 시 서버 로그 출력
       - name: Print server logs on failure
         if: failure()
         uses: appleboy/ssh-action@v1
+        env:
+          APP_NAME: ${{ env.APP_NAME }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: APP_NAME
           script: |
             bash -lc '
-              APP_DIR="/home/${{ secrets.SERVER_USER }}/app"
-              LOG_FILE="$APP_DIR/app.log"
-              echo "== app 디렉터리 =="
-              ls -lh "$APP_DIR" || true
-              echo "== JARs (app/) =="
-              ls -lh "$APP_DIR"/*.jar || true
+              APP_BASE="/home/${{ secrets.SERVER_USER }}/app/${APP_NAME}"
+              BUILD_DIR="$APP_BASE/build"
+              LOG_DIR="$APP_BASE/log"
+              LOG_FILE="$LOG_DIR/app.log"
+              echo "== build 디렉터리 =="
+              ls -lh "$BUILD_DIR" || true
+              echo "== JARs (build/) =="
+              ls -lh "$BUILD_DIR"/*.jar || true
               echo "== file =="
-              file "$APP_DIR"/*.jar || true
+              file "$BUILD_DIR"/*.jar || true
               echo "== tail log =="
               tail -n 400 "$LOG_FILE" || echo "log file not found"
             '
